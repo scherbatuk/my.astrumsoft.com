@@ -124,12 +124,6 @@
     <div class="container">
         <h1>Авторизация</h1>
         <form id="loginForm">
-            <div class="form-group ws-url-group">
-                <label for="wsUrl">WebSocket URL:</label>
-                <input type="text" id="wsUrl" name="wsUrl" required 
-                       placeholder="wss://your-api.com/ws" 
-                       value="wss://your-api.com/ws">
-            </div>
             
             <div class="form-group">
                 <label for="guid">GUID:</label>
@@ -167,7 +161,7 @@
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const wsUrl = document.getElementById('wsUrl').value;
+            const wsUrl = "wss://api.astrumsoft.com"
             const guid = document.getElementById('guid').value;
             const password = document.getElementById('password').value;
             const submitBtn = document.getElementById('submitBtn');
