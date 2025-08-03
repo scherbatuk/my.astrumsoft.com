@@ -109,14 +109,7 @@
             100% { transform: rotate(360deg); }
         }
         
-        .ws-url-group {
-            margin-bottom: 2rem;
-        }
-        
-        .ws-url-group input {
-            font-family: monospace;
-            font-size: 0.9rem;
-        }
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
@@ -124,6 +117,7 @@
     <div class="container">
         <h1>Авторизация</h1>
         <form id="loginForm">
+
             
             <div class="form-group">
                 <label for="guid">GUID:</label>
@@ -161,7 +155,6 @@
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const wsUrl = "wss://api.astrumsoft.com"
             const guid = document.getElementById('guid').value;
             const password = document.getElementById('password').value;
             const submitBtn = document.getElementById('submitBtn');
@@ -179,20 +172,15 @@
                 // Хешируем пароль
                 const hashedPassword = CryptoJS.SHA256(password).toString();
                 
+                // Формируем URL с параметрами
+                const wsUrl = `wss://api.astrumsoft.com?guid=${encodeURIComponent(guid)}&password=${encodeURIComponent(hashedPassword)}`;
+                
                 // Создаем WebSocket соединение
                 const ws = new WebSocket(wsUrl);
                 
                 ws.onopen = function() {
                     console.log('WebSocket соединение установлено');
-                    
-                    // Отправляем данные авторизации
-                    const authData = {
-                        type: 'auth',
-                        guid: guid,
-                        password: hashedPassword
-                    };
-                    
-                    ws.send(JSON.stringify(authData));
+                    // Авторизация происходит через URL параметры
                 };
                 
                 ws.onmessage = function(event) {
