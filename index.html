@@ -189,7 +189,7 @@
                         console.log('Получен ответ:', response);
                         
                         // Проверяем успешность авторизации
-                        if (response.success || response.status === 'authenticated' || response.type === 'auth_success') {
+                        if (response.success || response.status === 'success' || response.type === 'connection') {
                             // Сохраняем данные авторизации
                             const authData = {
                                 wsUrl: wsUrl,
