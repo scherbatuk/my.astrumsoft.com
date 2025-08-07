@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель управления</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 2rem;
+        }
+        
+        .header {
+            background: white;
+            padding: 1rem 2rem;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            color: #333;
+        }
+        
+        .user-info {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: background 0.3s;
+        }
+        
+        .logout-btn:hover {
+            background: #c82333;
+        }
+        
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            margin-bottom: 2rem;
+        }
+        
+        .status {
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-weight: 500;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .status.connecting {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .data-container {
+            min-height: 200px;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #e1e5e9;
+            border-radius: 5px;
+            padding: 1rem;
+            background: #f8f9fa;
+        }
+        
+        .data-item {
+            padding: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: white;
+            border-radius: 3px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .timestamp {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Панель управления</h1>
+            <div class="user-info" id="userInfo">GUID: загрузка...</div>
+        </div>
+        <button class="logout-btn" onclick="logout()">Выход</button>
+    </div>
+    
+    <div class="container">
+        <div id="connectionStatus" class="status connecting">
+            <span class="spinner"></span>
+            Подключение к серверу...
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" id="connectBtn" onclick="connect()">Подключиться</button>
+            <button class="btn btn-secondary" id="disconnectBtn" onclick="disconnect()" disabled>Отключиться</button>
+            <button class="btn btn-success" id="requestDataBtn" onclick="requestData()" disabled>Запросить данные</button>
+        </div>
+        
+        <h3>Данные от сервера:</h3>
+        <div id="dataContainer" class="data-container">
+            <p style="color: #666; text-align: center; margin: 2rem;">Нет данных</p>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let authData = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        
+        // Проверяем авторизацию при загрузке
+        window.addEventListener('load', function() {
+            const savedAuth = localStorage.getItem('wsAuth');
+            if (!savedAuth) {
+                // Если нет сохраненных данных, возвращаемся на страницу логина
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            try {
+                authData = JSON.parse(savedAuth);
+                document.getElementById('userInfo').textContent = `GUID: ${authData.guid}`;
+                
+                // Автоматически подключаемся
+                connect();
+            } catch (error) {
+                console.error('Ошибка загрузки данных авторизации:', error);
+                logout();
+            }
+        });
+        
+        function connect() {
+            if (!authData) {
+                showStatus('disconnected', 'Нет данных авторизации');
+                return;
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                showStatus('connected', 'Уже подключено');
+                return;
+            }
+            
+            showStatus('connecting', 'Подключение к серверу...');
+            updateButtons(false, false, false);
+            
+            try {
+                // Формируем URL с параметрами авторизации
+                const wsUrl = `wss://api.astrumsoft.com?guid=${encodeURIComponent(authData.guid)}&password=${encodeURIComponent(authData.password)}`;
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    console.log('WebSocket соединение установлено');
+                    showStatus('connected', 'Подключено и авторизовано');
+                    updateButtons(false, true, true);
+                    reconnectAttempts = 0;
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        console.log('Получено сообщение:', data);
+                        
+                        // Все сообщения считаем обычными данными от сервера
+                        addDataItem(data);
+                        
+                    } catch (parseError) {
+                        console.error('Ошибка парсинга сообщения:', parseError);
+                        addDataItem({
+                            type: 'raw_message',
+                            data: event.data,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket ошибка:', error);
+                    showStatus('disconnected', 'Ошибка соединения (возможно неверные учетные данные)');
+                    updateButtons(true, false, false);
+                };
+                
+                ws.onclose = function(event) {
+                    console.log('WebSocket соединение закрыто:', event.code, event.reason);
+                    showStatus('disconnected', `Соединение закрыто (код: ${event.code})`);
+                    updateButtons(true, false, false);
+                    
+                    // Автоматическое переподключение
+                    if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        setTimeout(() => {
+                            console.log(`Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts}`);
+                            connect();
+                        }, 3000 * reconnectAttempts);
+                    }
+                };
+                
+            } catch (error) {
+                console.error('Ошибка создания WebSocket:', error);
+                showStatus('disconnected', 'Не удалось создать соединение');
+                updateButtons(true, false, false);
+            }
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close(1000, 'Отключение по запросу пользователя');
+                ws = null;
+            }
+            showStatus('disconnected', 'Отключено');
+            updateButtons(true, false, false);
+        }
+        
+        function requestData() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showStatus('disconnected', 'Нет соединения');
+                return;
+            }
+            
+            // Отправляем запрос данных
+            const request = {
+                type: 'data_request',
+                timestamp: new Date().toISOString()
+            };
+            
+            ws.send(JSON.stringify(request));
+            addDataItem({
+                type: 'request_sent',
+                message: 'Запрос данных отправлен',
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        function logout() {
+            if (ws) {
+                ws.close();
+            }
+            localStorage.removeItem('wsAuth');
+            window.location.href = 'index.html';
+        }
+        
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.className = `status ${type}`;
+            
+            if (type === 'connecting') {
+                statusDiv.innerHTML = `<span class="spinner"></span>${message}`;
+            } else {
+                statusDiv.textContent = message;
+            }
+        }
+        
+        function updateButtons(connect, disconnect, requestData) {
+            document.getElementById('connectBtn').disabled = !connect;
+            document.getElementById('disconnectBtn').disabled = !disconnect;
+            document.getElementById('requestDataBtn').disabled = !requestData;
+        }
+        
+        function addDataItem(data) {
+            const container = document.getElementById('dataContainer');
+            
+            // Очищаем заглушку при первом сообщении
+            if (container.children.length === 1 && container.textContent.includes('Нет данных')) {
+                container.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = 'data-item';
+            
+            const timestamp = document.createElement('div');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = data.timestamp || new Date().toLocaleString();
+            
+            const content = document.createElement('pre');
+            content.textContent = JSON.stringify(data, null, 2);
+            
+            item.appendChild(timestamp);
+            item.appendChild(content);
+            
+            container.appendChild(item);
+            
+            // Прокручиваем вниз
+            container.scrollTop = container.scrollHeight;
+            
+            // Ограничиваем количество элементов
+            while (container.children.length > 50) {
+                container.removeChild(container.firstChild);
+            }
+        }
+    </script>
+</body>
+</html>
