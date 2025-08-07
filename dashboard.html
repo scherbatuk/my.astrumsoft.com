@@ -313,8 +313,7 @@
             
             // Отправляем запрос данных
             const request = {
-                type: 'data_request',
-                timestamp: new Date().toISOString()
+                type: 'version'
             };
             
             ws.send(JSON.stringify(request));
