@@ -262,12 +262,12 @@
                     <tr>
                         <th>Имя</th>
                         <th>Статус</th>
-                        <th>Онлайн</th>
-                        <th>Клиент</th>
-                        <th>Скидка</th>
-                        <th>Свободное время</th>
                         <th>Оставшееся время</th>
                         <th>Время начала/окончания</th>
+                        <th>Клиент</th>
+                        <th>Скидка</th>
+                        <th>Бесплатно</th>
+                        <th>Онлайн</th>
                     </tr>
                 </thead>
                 <tbody id="computersTableBody">
@@ -450,7 +450,7 @@
                         statusClass = 'free';
                         break;
                     case 1: // ST_REGULAR
-                        statusText = 'Работает (обычный)';
+                        statusText = 'Занят';
                         statusClass = 'busy';
                         break;
                     case 3: // ST_TIMEOUT
@@ -458,15 +458,15 @@
                         statusClass = 'timeout';
                         break;
                     case 4: // ST_TIMER
-                        statusText = 'Работает (по таймеру)';
+                        statusText = 'Таймер';
                         statusClass = 'busy';
                         break;
                     case (1 + PAUSE_MASK): // ST_PAUSE_REGULAR
-                        statusText = 'Пауза (обычный)';
+                        statusText = 'Пауза';
                         statusClass = 'paused';
                         break;
                     case (4 + PAUSE_MASK): // ST_PAUSE_TIMER
-                        statusText = 'Пауза (таймер)';
+                        statusText = 'Пауза-таймер';
                         statusClass = 'paused';
                         break;
                     case 0xFFFFFFFF: // ST_UNINITIALIZED
@@ -482,12 +482,12 @@
                 row.innerHTML = `
                     <td>${computer.name || 'Компьютер ' + computer.compnum}</td>
                     <td><span class="computer-status ${statusClass}">${statusText}</span></td>
-                    <td><span class="${computer.online ? 'status-online' : 'status-offline'}">${computer.online ? 'Онлайн' : 'Оффлайн'}</span></td>
+                    <td>${computer.remainingSpentTime || '-'}</td>
+                    <td>${computer.startFinishTime || '-'}</td>
                     <td>${computer.regularClientFirstname || '-'}</td>
                     <td>${computer.discount ? computer.discount + '%' : '-'}</td>
                     <td>${computer.isFree ? 'Да' : 'Нет'}</td>
-                    <td>${computer.remainingSpentTime || '-'}</td>
-                    <td>${computer.startFinishTime || '-'}</td>
+                    <td><span class="${computer.online ? 'status-online' : 'status-offline'}">${computer.online ? 'Онлайн' : 'Оффлайн'}</span></td>
                 `;
                 
                 tbody.appendChild(row);
