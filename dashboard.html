@@ -123,28 +123,47 @@
             color: white;
         }
         
-        .data-container {
-            min-height: 200px;
-            max-height: 500px;
+        .computers-table-container {
+            margin-top: 1rem;
+            overflow-x: auto;
+            max-height: 600px;
             overflow-y: auto;
-            border: 1px solid #e1e5e9;
-            border-radius: 5px;
-            padding: 1rem;
-            background: #f8f9fa;
         }
         
-        .data-item {
-            padding: 0.5rem;
-            margin-bottom: 0.5rem;
-            background: white;
-            border-radius: 3px;
-            border-left: 4px solid #667eea;
+        .computers-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
         }
         
-        .timestamp {
-            font-size: 0.8rem;
-            color: #666;
-            margin-bottom: 0.25rem;
+        .computers-table th,
+        .computers-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .computers-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #495057;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .computers-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .status-online {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .status-offline {
+            color: #dc3545;
+            font-weight: 600;
         }
         
         .spinner {
@@ -163,10 +182,40 @@
             100% { transform: rotate(360deg); }
         }
         
-        pre {
-            margin: 0;
-            white-space: pre-wrap;
-            word-break: break-word;
+        .no-data {
+            text-align: center;
+            color: #666;
+            padding: 2rem;
+            font-style: italic;
+        }
+        
+        .last-update {
+            font-size: 0.9rem;
+            color: #666;
+            text-align: right;
+            margin-top: 1rem;
+        }
+        
+        .computer-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .computer-status.free {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .computer-status.busy {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .computer-status.blocked {
+            background: #f8d7da;
+            color: #721c24;
         }
     </style>
 </head>
@@ -188,13 +237,33 @@
         <div class="controls">
             <button class="btn btn-primary" id="connectBtn" onclick="connect()">Подключиться</button>
             <button class="btn btn-secondary" id="disconnectBtn" onclick="disconnect()" disabled>Отключиться</button>
-            <button class="btn btn-success" id="requestDataBtn" onclick="requestData()" disabled>Запросить данные</button>
+            <button class="btn btn-success" id="refreshBtn" onclick="refreshData()" disabled>Обновить</button>
         </div>
         
-        <h3>Данные от сервера:</h3>
-        <div id="dataContainer" class="data-container">
-            <p style="color: #666; text-align: center; margin: 2rem;">Нет данных</p>
+        <h3>Статус компьютеров</h3>
+        <div class="computers-table-container">
+            <table class="computers-table" id="computersTable">
+                <thead>
+                    <tr>
+                        <th>№</th>
+                        <th>Имя</th>
+                        <th>Статус</th>
+                        <th>Онлайн</th>
+                        <th>Клиент</th>
+                        <th>Скидка</th>
+                        <th>Свободное время</th>
+                        <th>Оставшееся время</th>
+                        <th>Время начала/окончания</th>
+                    </tr>
+                </thead>
+                <tbody id="computersTableBody">
+                    <tr>
+                        <td colspan="9" class="no-data">Нет данных</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+        <div class="last-update" id="lastUpdate"></div>
     </div>
 
     <script>
@@ -207,7 +276,6 @@
         window.addEventListener('load', function() {
             const savedAuth = localStorage.getItem('wsAuth');
             if (!savedAuth) {
-                // Если нет сохраненных данных, возвращаемся на страницу логина
                 window.location.href = 'index.html';
                 return;
             }
@@ -239,7 +307,6 @@
             updateButtons(false, false, false);
             
             try {
-                // Формируем URL с параметрами авторизации
                 const wsUrl = `wss://api.astrumsoft.com?guid=${encodeURIComponent(authData.guid)}&password=${encodeURIComponent(authData.password)}`;
                 ws = new WebSocket(wsUrl);
                 
@@ -248,6 +315,9 @@
                     showStatus('connected', 'Подключено и авторизовано');
                     updateButtons(false, true, true);
                     reconnectAttempts = 0;
+                    
+                    // Автоматически запрашиваем данные при подключении
+                    refreshData();
                 };
                 
                 ws.onmessage = function(event) {
@@ -255,16 +325,12 @@
                         const data = JSON.parse(event.data);
                         console.log('Получено сообщение:', data);
                         
-                        // Все сообщения считаем обычными данными от сервера
-                        addDataItem(data);
+                        if (data.type === 'getIndicatorsStatusResponse') {
+                            updateComputersTable(data.indicators);
+                        }
                         
                     } catch (parseError) {
                         console.error('Ошибка парсинга сообщения:', parseError);
-                        addDataItem({
-                            type: 'raw_message',
-                            data: event.data,
-                            timestamp: new Date().toISOString()
-                        });
                     }
                 };
                 
@@ -305,23 +371,18 @@
             updateButtons(true, false, false);
         }
         
-        function requestData() {
+        function refreshData() {
             if (!ws || ws.readyState !== WebSocket.OPEN) {
                 showStatus('disconnected', 'Нет соединения');
                 return;
             }
             
-            // Отправляем запрос данных
             const request = {
-                type: 'version'
+                type: 'getIndicatorsStatus'
             };
             
             ws.send(JSON.stringify(request));
-            addDataItem({
-                type: 'request_sent',
-                message: 'Запрос данных отправлен',
-                timestamp: new Date().toISOString()
-            });
+            console.log('Запрос данных отправлен');
         }
         
         function logout() {
@@ -343,42 +404,57 @@
             }
         }
         
-        function updateButtons(connect, disconnect, requestData) {
+        function updateButtons(connect, disconnect, refresh) {
             document.getElementById('connectBtn').disabled = !connect;
             document.getElementById('disconnectBtn').disabled = !disconnect;
-            document.getElementById('requestDataBtn').disabled = !requestData;
+            document.getElementById('refreshBtn').disabled = !refresh;
         }
         
-        function addDataItem(data) {
-            const container = document.getElementById('dataContainer');
+        function updateComputersTable(indicators) {
+            const tbody = document.getElementById('computersTableBody');
+            const lastUpdate = document.getElementById('lastUpdate');
             
-            // Очищаем заглушку при первом сообщении
-            if (container.children.length === 1 && container.textContent.includes('Нет данных')) {
-                container.innerHTML = '';
+            if (!indicators || indicators.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="no-data">Нет данных о компьютерах</td></tr>';
+                return;
             }
             
-            const item = document.createElement('div');
-            item.className = 'data-item';
+            tbody.innerHTML = '';
             
-            const timestamp = document.createElement('div');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = data.timestamp || new Date().toLocaleString();
+            indicators.forEach(computer => {
+                const row = document.createElement('tr');
+                
+                // Определяем статус компьютера
+                let statusText = 'Неизвестно';
+                let statusClass = '';
+                
+                if (computer.isFree) {
+                    statusText = 'Свободен';
+                    statusClass = 'free';
+                } else if (computer.status === 1) {
+                    statusText = 'Занят';
+                    statusClass = 'busy';
+                } else if (computer.status === 0) {
+                    statusText = 'Заблокирован';
+                    statusClass = 'blocked';
+                }
+                
+                row.innerHTML = `
+                    <td>${computer.compnum}</td>
+                    <td>${computer.name || 'Компьютер ' + computer.compnum}</td>
+                    <td><span class="computer-status ${statusClass}">${statusText}</span></td>
+                    <td><span class="${computer.online ? 'status-online' : 'status-offline'}">${computer.online ? 'Онлайн' : 'Оффлайн'}</span></td>
+                    <td>${computer.regularClientFirstname || '-'}</td>
+                    <td>${computer.discount ? computer.discount + '%' : '-'}</td>
+                    <td>${computer.isFree ? 'Да' : 'Нет'}</td>
+                    <td>${computer.remainingSpentTime || '-'}</td>
+                    <td>${computer.startFinishTime || '-'}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
             
-            const content = document.createElement('pre');
-            content.textContent = JSON.stringify(data, null, 2);
-            
-            item.appendChild(timestamp);
-            item.appendChild(content);
-            
-            container.appendChild(item);
-            
-            // Прокручиваем вниз
-            container.scrollTop = container.scrollHeight;
-            
-            // Ограничиваем количество элементов
-            while (container.children.length > 50) {
-                container.removeChild(container.firstChild);
-            }
+            lastUpdate.textContent = `Последнее обновление: ${new Date().toLocaleString()}`;
         }
     </script>
 </body>
