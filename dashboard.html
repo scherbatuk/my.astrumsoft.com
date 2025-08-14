@@ -262,8 +262,8 @@
                     <tr>
                         <th>Имя</th>
                         <th>Статус</th>
-                        <th>Оставшееся время</th>
                         <th>Время начала/окончания</th>
+                        <th>Оставшееся/прошедшее время</th>
                         <th>Клиент</th>
                         <th>Скидка</th>
                         <th>Бесплатно</th>
@@ -482,8 +482,8 @@
                 row.innerHTML = `
                     <td>${computer.name || 'Компьютер ' + computer.compnum}</td>
                     <td><span class="computer-status ${statusClass}">${statusText}</span></td>
-                    <td>${computer.remainingSpentTime || '-'}</td>
                     <td>${computer.startFinishTime || '-'}</td>
+                    <td>${computer.remainingSpentTime || '-'}</td>
                     <td>${computer.regularClientFirstname || '-'}</td>
                     <td>${computer.discount ? computer.discount + '%' : '-'}</td>
                     <td>${computer.isFree ? 'Да' : 'Нет'}</td>
