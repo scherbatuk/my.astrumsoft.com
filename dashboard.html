@@ -213,7 +213,22 @@
             color: #856404;
         }
         
-        .computer-status.blocked {
+        .computer-status.timeout {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .computer-status.paused {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .computer-status.uninitialized {
+            background: #e2e3e5;
+            color: #6c757d;
+        }
+        
+        .computer-status.unknown {
             background: #f8d7da;
             color: #721c24;
         }
@@ -245,7 +260,6 @@
             <table class="computers-table" id="computersTable">
                 <thead>
                     <tr>
-                        <th>№</th>
                         <th>Имя</th>
                         <th>Статус</th>
                         <th>Онлайн</th>
@@ -258,7 +272,7 @@
                 </thead>
                 <tbody id="computersTableBody">
                     <tr>
-                        <td colspan="9" class="no-data">Нет данных</td>
+                        <td colspan="8" class="no-data">Нет данных</td>
                     </tr>
                 </tbody>
             </table>
@@ -415,7 +429,7 @@
             const lastUpdate = document.getElementById('lastUpdate');
             
             if (!indicators || indicators.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="no-data">Нет данных о компьютерах</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="no-data">Нет данных о компьютерах</td></tr>';
                 return;
             }
             
@@ -424,23 +438,48 @@
             indicators.forEach(computer => {
                 const row = document.createElement('tr');
                 
-                // Определяем статус компьютера
+                // Определяем статус компьютера на основе enum
                 let statusText = 'Неизвестно';
                 let statusClass = '';
                 
-                if (computer.isFree) {
-                    statusText = 'Свободен';
-                    statusClass = 'free';
-                } else if (computer.status === 1) {
-                    statusText = 'Занят';
-                    statusClass = 'busy';
-                } else if (computer.status === 0) {
-                    statusText = 'Заблокирован';
-                    statusClass = 'blocked';
+                const PAUSE_MASK = 0x10000000;
+                
+                switch (computer.status) {
+                    case 0: // ST_FREE
+                        statusText = 'Свободен';
+                        statusClass = 'free';
+                        break;
+                    case 1: // ST_REGULAR
+                        statusText = 'Работает (обычный)';
+                        statusClass = 'busy';
+                        break;
+                    case 3: // ST_TIMEOUT
+                        statusText = 'Время истекло';
+                        statusClass = 'timeout';
+                        break;
+                    case 4: // ST_TIMER
+                        statusText = 'Работает (по таймеру)';
+                        statusClass = 'busy';
+                        break;
+                    case (1 + PAUSE_MASK): // ST_PAUSE_REGULAR
+                        statusText = 'Пауза (обычный)';
+                        statusClass = 'paused';
+                        break;
+                    case (4 + PAUSE_MASK): // ST_PAUSE_TIMER
+                        statusText = 'Пауза (таймер)';
+                        statusClass = 'paused';
+                        break;
+                    case 0xFFFFFFFF: // ST_UNINITIALIZED
+                        statusText = 'Не инициализирован';
+                        statusClass = 'uninitialized';
+                        break;
+                    default:
+                        statusText = `Неизвестный (${computer.status})`;
+                        statusClass = 'unknown';
+                        break;
                 }
                 
                 row.innerHTML = `
-                    <td>${computer.compnum}</td>
                     <td>${computer.name || 'Компьютер ' + computer.compnum}</td>
                     <td><span class="computer-status ${statusClass}">${statusText}</span></td>
                     <td><span class="${computer.online ? 'status-online' : 'status-offline'}">${computer.online ? 'Онлайн' : 'Оффлайн'}</span></td>
