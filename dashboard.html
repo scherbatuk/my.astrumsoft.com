@@ -342,6 +342,16 @@
                         if (data.type === 'getIndicatorsStatusResponse') {
                             updateComputersTable(data.indicators);
                         }
+                            else if (data.type === 'error' && data.code === 'CLIENT_NOT_FOUND') {
+                            console.log('Клиент не найден:', data.message);
+                            showStatus('disconnected', data.message);
+                            updateButtons(true, false, false);
+                            
+                            // Закрываем соединение, так как клиент не найден
+                            if (ws) {
+                                ws.close(1000, 'Client not found - disconnecting');
+                            }
+                        }
                         
                     } catch (parseError) {
                         console.error('Ошибка парсинга сообщения:', parseError);
