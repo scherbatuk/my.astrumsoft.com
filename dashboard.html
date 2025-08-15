@@ -354,18 +354,31 @@
                     updateButtons(true, false, false);
                 };
                 
-                ws.onclose = function(event) {
+                 ws.onclose = function(event) {
                     console.log('WebSocket соединение закрыто:', event.code, event.reason);
                     showStatus('disconnected', `Соединение закрыто (код: ${event.code})`);
                     updateButtons(true, false, false);
                     
-                    // Автоматическое переподключение
-                    if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+                    // Проверяем, нужно ли автоматическое переподключение
+                    const shouldReconnect = shouldAttemptReconnect(event.code);
+                    
+                    if (shouldReconnect && reconnectAttempts < maxReconnectAttempts) {
                         reconnectAttempts++;
+                        const delay = Math.min(3000 * reconnectAttempts, 30000); // Максимум 30 секунд
+                        console.log(`Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts} через ${delay/1000} сек`);
+                        
                         setTimeout(() => {
-                            console.log(`Попытка переподключения ${reconnectAttempts}/${maxReconnectAttempts}`);
                             connect();
-                        }, 3000 * reconnectAttempts);
+                        }, delay);
+                    } else if (!shouldReconnect) {
+                        console.log('Автореконнект отключен для кода:', event.code);
+                        // При ошибках авторизации предлагаем перелогиниться
+                        if (event.code >= 4001 && event.code <= 4006) {
+                            showStatus('disconnected', 'Ошибка авторизации. Требуется повторный вход.');
+                        }
+                    } else {
+                        console.log('Исчерпаны попытки переподключения');
+                        showStatus('disconnected', 'Не удалось восстановить соединение');
                     }
                 };
                 
@@ -494,6 +507,26 @@
             });
             
             lastUpdate.textContent = `Последнее обновление: ${new Date().toLocaleString()}`;
+        }
+
+        /**
+         * Определяет, нужно ли пытаться переподключиться на основе кода закрытия
+         */
+        function shouldAttemptReconnect(code) {
+            // Коды, при которых НЕ нужно переподключаться автоматически
+            const noReconnectCodes = [
+                1000, // Нормальное закрытие
+                1001, // Going away
+                4001, // Missing mandatory parameters
+                4002, // Invalid guid format  
+                4003, // Invalid password format
+                4004, // Invalid guid format
+                4005, // Invalid authorization
+                4006, // Rate limit exceeded / Invalid password
+                4007  // Unauthorized - connection not initialized
+            ];
+            
+            return !noReconnectCodes.includes(code);
         }
     </script>
 </body>
