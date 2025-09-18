@@ -342,7 +342,10 @@
                         if (data.type === 'getIndicatorsStatusResponse') {
                             updateComputersTable(data.indicators);
                         }
-                            else if (data.type === 'error' && data.code === 'CLIENT_NOT_FOUND') {
+                        else if (data.type === 'computerStatusUpdateNotification') {
+                            refreshData();
+                        }
+                        else if (data.type === 'error' && data.code === 'CLIENT_NOT_FOUND') {
                             console.log('Клиент не найден:', data.message);
                             showStatus('disconnected', data.message);
                             updateButtons(true, false, false);
